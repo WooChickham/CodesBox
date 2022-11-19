@@ -1,0 +1,97 @@
+#include <Servo.h>;
+#include <LiquidCrystal.h>
+LiquidCrystal lcd(7, 6, 5, 4, 3, 2);
+Servo servo_9;
+Servo servo_8;
+//parameter setting
+int set_time=3000;		
+int pos1=0; //initial position of servo motor 1
+int pos2=0;	//initial position of servo motor 2
+int light_thre=300;		//maximum illumination value to turn of the system
+void setup()
+{
+  //configure pins
+  Serial.begin(9600);
+  pinMode(13, INPUT);
+  pinMode(12, INPUT);
+  pinMode(11, OUTPUT);
+  pinMode(10, OUTPUT);
+  pinMode(9, OUTPUT);
+  pinMode(8, OUTPUT);
+  servo_9.attach(9);
+  servo_8.attach(8);
+  
+}
+
+//main code
+void loop()
+{
+  
+  //judge whether the system meets the opening conditions:  
+  //when the light is weak enough, the system will be powered on after the set time
+  if (analogRead(A0)<light_thre){	//nighttime
+    delay(set_time);
+    digitalWrite(10,1);	//turn on the system relay. The system is powered on.
+    while (analogRead(A0)<light_thre){
+        lcd.begin(16,2);
+        lcd.print("ClassRoom 229");
+      	//when sensor 1 and 2 both detect human body 
+    	while (analogRead(A0)<light_thre&&digitalRead(13)&&digitalRead(12)){
+      	  digitalWrite(11,1);		//turn on the relay of the electrical system to control the lamps
+          lcd.setCursor(0,1);
+          lcd.print("Somebody");
+    	}
+    	//when only sensor 2 detects human body
+    	while (analogRead(A0)<light_thre&&!digitalRead(13)&&digitalRead(12)){           
+      	  digitalWrite(11,1);		//turn on the relay of electric system
+      	  pos1+=10;					//the angle increases 10 every cycle
+      	  if (pos1>90){pos1-=90;}	//Limit the maximum rotation angle of the servo motor to 90 degrees
+      	  servo_9.write(pos1);		//drive servo motor 1 to rotate
+          lcd.setCursor(0,1);
+          lcd.print("Somebody");
+          //Simulate Arduino sends data to FPGA to drive motor:
+          Serial.print(pos1/9);
+      	  delay(500);
+    	}
+    	//when only sensor 1 detects human body
+    	while (analogRead(A0)<light_thre&&!digitalRead(12)&&digitalRead(13)){          
+      	  digitalWrite(11,1);		//turn on the relay of electric system
+      	  pos2+=10;					//the angle increases 10 every cycle
+      	  if (pos2>90){pos2-=90;}	//Limit the maximum rotation angle of the servo motor to 90 degrees
+      	  servo_8.write(pos2);		//drive servo motor 2 to rotate
+          lcd.setCursor(0,1);
+          lcd.print("Somebody");
+          //Simulate Arduino sends data to FPGA to drive motor:
+          Serial.print(pos2/9);
+      	  delay(500);          
+    	}
+    	//when no sensor detects human body        
+    	while (analogRead(A0)<light_thre&&!digitalRead(13)&&!digitalRead(12)){     
+      	  pos1=0;
+      	  pos2=0;					//reset servo motors' position
+      	  servo_9.write(pos1);		
+      	  servo_8.write(pos2);		//drive the motors rotates to the set angle
+      	  digitalWrite(11,0);		//disconnect the relay of electric system, cut off the power of lamps
+          lcd.setCursor(0,1);
+          lcd.print("           ");
+          lcd.setCursor(0,1);
+          lcd.print("None");
+          //Simulate Arduino sends data to FPGA to drive motor:
+          Serial.print(0);
+      	  delay(500);          
+    	}
+    }          
+  }
+  if (analogRead(A0)>light_thre){
+    //daytime
+    pos1=0;
+    pos2=0;							//reset servo motors' position
+    servo_9.write(pos1);	
+    servo_8.write(pos2);			//drive the motors rotates to the set angle
+    digitalWrite(10,0);				//turn off the system by disconnecting the system relay
+    digitalWrite(11,1);				//turn on the relay of the electrical system so the lamps are only controlled by the mechanical switches
+    //Simulate Arduino sends data to FPGA to drive motor:
+    Serial.print(0);
+    delay(500);    
+  }  
+}
